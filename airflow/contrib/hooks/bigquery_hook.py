@@ -77,7 +77,8 @@ class BigQueryHook(object):
             write_disposition='WRITE_EMPTY',
             allow_large_results=False,
             udf_config=False,
-            use_legacy_sql=False):
+            use_legacy_sql=False,
+            maximum_billing_tier=1):
         """
         Executes a BigQuery SQL query. Optionally persists results in a BigQuery
         table. See here:
@@ -99,11 +100,14 @@ class BigQueryHook(object):
         :type udf_config: list
         :param use_legacy_sql: Whether to use legacy SQL or standard SQL
         :type use_legacy_sql: boolean
+        :param maximum_billing_tier: Limits the billing tier for this query
+        :type maximum_billing_tier: integer
         """
         configuration = {
             'query': {
                 'query': bql,
-                'useLegacySql': use_legacy_sql
+                'useLegacySql': use_legacy_sql,
+                'maximumBillingTier': maximum_billing_tier
             }
         }
 
