@@ -18,35 +18,35 @@ import logging
 from apiclient.discovery import build
 from apiclient.http import MediaFileUpload
 from googleapiclient import errors
-
-from airflow.contrib.hooks.gcp_api_base_hook import GoogleCloudBaseHook
+from oauth2client.client import GoogleCredentials
 
 logging.getLogger("google_cloud_storage").setLevel(logging.INFO)
 
 
-class GoogleCloudStorageHook(GoogleCloudBaseHook):
+class GoogleCloudStorageHook(object):
     """
     Interact with Google Cloud Storage. This hook uses the Google Cloud Platform
     connection.
     """
 
     def __init__(self,
-                 google_cloud_storage_conn_id='google_cloud_storage_default',
+                 gcp_conn_id='google_cloud_default',
                  delegate_to=None):
-        super(GoogleCloudStorageHook, self).__init__(google_cloud_storage_conn_id,
-                                                     delegate_to)
 
-    def get_conn(self):
+        self.service = self._get_conn()
+        self.objects = self.service.objects()
+
+    def _get_conn(self):
         """
         Returns a Google Cloud Storage service object.
         """
-        http_authorized = self._authorize()
-        return build('storage', 'v1', http=http_authorized)
+        credentials = GoogleCredentials.get_application_default()
+
+        return build('storage', 'v1', credentials=credentials)
 
     def download(self, bucket, object, filename=False):
         """
         Get a file from Google Cloud Storage.
-
         :param bucket: The bucket to fetch from.
         :type bucket: string
         :param object: The object to fetch.
@@ -54,9 +54,7 @@ class GoogleCloudStorageHook(GoogleCloudBaseHook):
         :param filename: If set, a local file path where the file should be written to.
         :type filename: string
         """
-        service = self.get_conn()
-        downloaded_file_bytes = service \
-            .objects() \
+        downloaded_file_bytes = self.objects \
             .get_media(bucket=bucket, object=object) \
             .execute()
 
@@ -71,7 +69,6 @@ class GoogleCloudStorageHook(GoogleCloudBaseHook):
     def upload(self, bucket, object, filename, mime_type='application/octet-stream'):
         """
         Uploads a local file to Google Cloud Storage.
-
         :param bucket: The bucket to upload to.
         :type bucket: string
         :param object: The object name to set when uploading the local file.
@@ -81,27 +78,22 @@ class GoogleCloudStorageHook(GoogleCloudBaseHook):
         :param mime_type: The MIME type to set when uploading the file.
         :type mime_type: string
         """
-        service = self.get_conn()
         media = MediaFileUpload(filename, mime_type)
-        response = service \
-            .objects() \
+        self.objects \
             .insert(bucket=bucket, name=object, media_body=media) \
             .execute()
 
     def exists(self, bucket, object):
         """
         Checks for the existence of a file in Google Cloud Storage.
-
         :param bucket: The Google cloud storage bucket where the object is.
         :type bucket: string
         :param object: The name of the object to check in the Google cloud
             storage bucket.
         :type object: string
         """
-        service = self.get_conn()
         try:
-            service \
-                .objects() \
+            self.objects \
                 .get(bucket=bucket, object=object) \
                 .execute()
             return True
@@ -109,3 +101,16 @@ class GoogleCloudStorageHook(GoogleCloudBaseHook):
             if ex.resp['status'] == '404':
                 return False
             raise
+
+    def delete(self, bucket, object):
+        """
+        Delete a file from Google Cloud Storage.
+        :param bucket: The Google cloud storage bucket where the object is.
+        :type bucket: string
+        :param object: The name of the object to check in the Google cloud
+            storage bucket.
+        :type object: string
+        """
+        self.objects \
+            .delete(bucket=bucket, object=object) \
+            .execute()
